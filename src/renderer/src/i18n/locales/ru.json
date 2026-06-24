@@ -1,0 +1,18 @@
+{
+  "app": { "title": "BelNote" },
+  "editor": {
+    "placeholder": "Начните печатать заметку…",
+    "title_placeholder": "Заголовок",
+    "edited": "Изменено {when}"
+  },
+  "toolbar": {
+    "bold": "Жирный",
+    "italic": "Курсив",
+    "code": "Код в строке",
+    "code_block": "Блок кода",
+    "task_list": "Чек-лист",
+    "link": "Ссылка",
+    "language": "Язык"
+  },
+  "demo": { "note_title": "Локальный доступ" }
+}

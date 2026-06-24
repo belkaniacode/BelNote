@@ -1,0 +1,18 @@
+{
+  "app": { "title": "BelNote" },
+  "editor": {
+    "placeholder": "Start typing your note…",
+    "title_placeholder": "Title",
+    "edited": "Edited {when}"
+  },
+  "toolbar": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "code": "Inline code",
+    "code_block": "Code block",
+    "task_list": "Task list",
+    "link": "Link",
+    "language": "Language"
+  },
+  "demo": { "note_title": "Local access" }
+}

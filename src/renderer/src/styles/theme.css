@@ -1,0 +1,26 @@
+/* BelNote dark theme tokens — mirrors the flet app's warm dark palette. */
+html.dark,
+:root {
+  --bn-bg: #1b1a1f;
+  --bn-sidebar: #201f26;
+  --bn-surface: #232228;
+  --bn-text: #ece9f1;
+  --bn-text-muted: #8b8794;
+  --bn-divider: #322f3a;
+  --bn-accent: #b3a7ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bn-bg);
+  color: var(--bn-text);
+}
