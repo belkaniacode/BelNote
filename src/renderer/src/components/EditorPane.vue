@@ -58,6 +58,9 @@ function onChange(payload: { html: string; text: string }): void {
 .editor-pane__body {
   flex: 1;
   overflow: hidden;
+  /* min-height:0 so the editor's own scroll area (.note-editor__content) governs scrolling
+     instead of this flex child growing to fit a long note. */
+  min-height: 0;
   padding: 4px 48px 24px;
   max-width: 820px;
   width: 100%;

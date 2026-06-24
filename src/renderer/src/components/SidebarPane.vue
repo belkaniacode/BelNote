@@ -127,6 +127,9 @@ async function deleteFolder(id: number): Promise<void> {
   flex: 1;
   gap: 1px;
   overflow-y: auto;
+  /* Required so this flex child can shrink below its content height and actually scroll
+     (default min-height:auto would let it grow and overflow instead). */
+  min-height: 0;
 }
 .sidebar__item {
   display: flex;

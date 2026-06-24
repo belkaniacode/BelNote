@@ -91,6 +91,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .app {
   display: grid;
   grid-template-columns: 230px 300px 1fr;
+  /* Cap the single row at the viewport. Without an explicit row track the implicit row is
+     `auto`, which grows to CONTENT height — so a tall sidebar/list pushes past 100vh and is
+     just clipped by body{overflow:hidden}, and the panes' own overflow:auto never engages.
+     minmax(0, 1fr) pins the row to the viewport so panes scroll internally instead. */
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   background: var(--bn-bg);
   color: var(--bn-text);

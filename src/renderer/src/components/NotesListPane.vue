@@ -223,6 +223,8 @@ async function emptyTrash(): Promise<void> {
 .list__scroll {
   flex: 1;
   overflow-y: auto;
+  /* min-height:0 lets this flex child shrink below content and scroll instead of overflowing. */
+  min-height: 0;
   /* gap separates rows so adjacent selected notes don't merge into one block;
      extra bottom padding gives breathing room after the last note. */
   display: flex;

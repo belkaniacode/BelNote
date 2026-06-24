@@ -149,6 +149,8 @@ function toggle(cmd: 'bold' | 'italic' | 'heading' | 'code' | 'codeBlock' | 'tas
 .note-editor__content {
   flex: 1;
   overflow-y: auto;
+  /* min-height:0 lets a long note scroll inside this pane instead of expanding it. */
+  min-height: 0;
 }
 :deep(.ProseMirror) {
   outline: none;
