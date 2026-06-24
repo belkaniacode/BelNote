@@ -14,6 +14,7 @@
   "list": {
     "search": "Search",
     "new_note": "New Note",
+    "toggle_sidebar": "Toggle sidebar",
     "no_notes": "No Notes",
     "no_notes_hint": "Create your first note",
     "no_results": "No matches",

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useNotesStore } from './stores/notes'
+import { useLayout, HANDLE } from './composables/useLayout'
 import SidebarPane from './components/SidebarPane.vue'
 import NotesListPane from './components/NotesListPane.vue'
 import EditorPane from './components/EditorPane.vue'
@@ -11,6 +12,54 @@ import EditorPane from './components/EditorPane.vue'
 // All data flows through the Pinia store, hydrated from SQLite on mount.
 const { t } = useI18n()
 const store = useNotesStore()
+
+// ---- Resizable / collapsible layout ----
+const { sidebarWidth, listWidth, collapsed, setSidebarWidth, setListWidth, toggleSidebar, persist } =
+  useLayout()
+
+// Column template: fixed sidebar + handle + fixed list + handle + flexible editor. When the
+// sidebar is collapsed its track and handle drop out entirely so the list starts at the edge.
+const gridStyle = computed(() => ({
+  gridTemplateColumns: collapsed.value
+    ? `${listWidth.value}px ${HANDLE}px 1fr`
+    : `${sidebarWidth.value}px ${HANDLE}px ${listWidth.value}px ${HANDLE}px 1fr`
+}))
+
+const resizing = ref<null | 'sidebar' | 'list'>(null)
+
+// Drag a seam to resize. Pointer events on window keep the drag alive even when the cursor
+// outruns the thin handle; body cursor/selection are locked so it reads as a clean resize.
+function startResize(which: 'sidebar' | 'list', e: PointerEvent): void {
+  e.preventDefault()
+  resizing.value = which
+  const startX = e.clientX
+  const startSidebar = sidebarWidth.value
+  const startList = listWidth.value
+
+  const onMove = (ev: PointerEvent): void => {
+    const dx = ev.clientX - startX
+    if (which === 'sidebar') {
+      setSidebarWidth(startSidebar + dx)
+    } else {
+      // Cap the list so the editor keeps EDITOR_MIN: available = window − sidebar track − handles.
+      const sidebarSpace = collapsed.value ? 0 : sidebarWidth.value + HANDLE
+      setListWidth(startList + dx, window.innerWidth - sidebarSpace - HANDLE)
+    }
+  }
+  const onUp = (): void => {
+    resizing.value = null
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    persist()
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+  }
+
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+}
 
 /** Should the Delete key be ignored because the user is typing? */
 function isTypingTarget(el: Element | null): boolean {
@@ -29,6 +78,15 @@ function isTypingTarget(el: Element | null): boolean {
 async function onKeydown(e: KeyboardEvent): Promise<void> {
   const el = document.activeElement
   const mod = e.ctrlKey || e.metaKey
+
+  // Toggle the sidebar — Ctrl/Cmd+\ . A window-level command, so it works even while typing;
+  // only suppressed while a dialog is open.
+  if (mod && e.key === '\\') {
+    if (document.querySelector('.el-overlay')) return
+    e.preventDefault()
+    toggleSidebar()
+    return
+  }
 
   // Undo / redo for deletions — keyboard only, no buttons. Ctrl/Cmd+Z = undo,
   // Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y = redo. Skipped inside the editor so text undo still works.
@@ -104,9 +162,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="app">
-    <SidebarPane class="app__sidebar" />
+  <div class="app" :class="{ 'is-resizing': resizing !== null }" :style="gridStyle">
+    <template v-if="!collapsed">
+      <SidebarPane class="app__sidebar" />
+      <div
+        class="app__resizer"
+        :class="{ 'is-active': resizing === 'sidebar' }"
+        @pointerdown="startResize('sidebar', $event)"
+      />
+    </template>
     <NotesListPane class="app__list" />
+    <div
+      class="app__resizer"
+      :class="{ 'is-active': resizing === 'list' }"
+      @pointerdown="startResize('list', $event)"
+    />
     <EditorPane class="app__editor" />
   </div>
 </template>
@@ -126,12 +196,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .app__sidebar {
   background: var(--bn-sidebar);
-  border-right: 1px solid var(--bn-divider);
   min-width: 0;
 }
 .app__list {
   background: var(--bn-list);
-  border-right: 1px solid var(--bn-divider);
   min-width: 0;
 }
 .app__editor {
@@ -139,12 +207,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   min-width: 0;
 }
 
-@media (max-width: 820px) {
-  .app {
-    grid-template-columns: 200px 1fr;
-  }
-  .app__editor {
-    display: none;
-  }
+/* Resize handle: a thin grab strip occupying its own 6px grid track. It draws the 1px divider
+   line in its centre (replacing the panes' border-right), so the seam looks like a hairline but
+   has a comfortable hit area and a col-resize cursor. */
+.app__resizer {
+  position: relative;
+  cursor: col-resize;
+  background: transparent;
+  /* don't let the strip get squeezed away */
+  min-width: 0;
+}
+.app__resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-0.5px);
+  background: var(--bn-divider);
+  transition: background var(--bn-transition);
+}
+.app__resizer:hover::before,
+.app__resizer.is-active::before {
+  background: var(--bn-accent);
+  width: 2px;
 }
 </style>
