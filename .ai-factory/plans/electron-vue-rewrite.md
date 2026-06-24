@@ -39,7 +39,7 @@ Goal: see the editor working on mock data before building the rest.
 3. [x] vue-i18n with ru/en JSON locales + a language switcher in `App.vue`.
 4. [x] `NoteEditor.vue` — TipTap with inline clickable+editable links, code blocks, task lists.
 5. [x] Main process routes external links to the system browser.
-6. [ ] `npm install` && `npm run dev` — confirm: type freely, URL becomes a styled clickable
+6. [x] `npm install` && `npm run dev` — confirm: type freely, URL becomes a styled clickable
    link that opens the browser, code block renders as code, checklist toggles.
 7. [ ] Vitest smoke test for the editor's link/auto-link + serialization (HTML round-trip).
 
