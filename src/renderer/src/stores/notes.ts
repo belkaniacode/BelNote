@@ -8,9 +8,14 @@ export type ViewId = number | typeof ALL_NOTES | typeof RECENTLY_DELETED
 const AUTOSAVE_MS = 600
 
 /**
- * The renderer's single source of truth. Mirrors the SQLite data via window.api and keeps
- * the selected view / note in sync. List ordering and trashing rules live in the main-process
- * repositories; this store just reflects and re-fetches.
+ * The renderer's single source of truth. Mirrors the SQLite data via window.api.
+ *
+ * IMPORTANT (anti-flicker): note mutations update the in-memory list IN PLACE — they never
+ * reload the whole list from the DB on each op. Reloading replaces every Note object with a
+ * fresh instance, which forces every list row (and its Element Plus dropdown) to re-render and
+ * resets scroll — the visible "jerk/redraw". Keeping object identity stable means Vue only
+ * patches the one row that changed. Counts are refreshed by merging fields into the existing
+ * `counts` object rather than replacing it, so the sidebar only updates the changed numbers.
  */
 export const useNotesStore = defineStore('notes', () => {
   const folders = ref<Folder[]>([])
@@ -23,7 +28,14 @@ export const useNotesStore = defineStore('notes', () => {
   })
 
   const selectedView = ref<ViewId>(ALL_NOTES)
+  // Bumped only when a note is freshly created, to tell the editor to grab focus for typing.
+  // (Plain selection must NOT focus the editor, or the list loses the Delete-key shortcut.)
+  const editorFocusTick = ref(0)
+  // Multi-selection: `selectedNoteIds` is the full set (for batch delete); `selectedNoteId`
+  // is the active/anchor note shown in the editor. `selectionAnchor` drives shift-range select.
+  const selectedNoteIds = ref<number[]>([])
   const selectedNoteId = ref<number | null>(null)
+  const selectionAnchor = ref<number | null>(null)
   const searchQuery = ref('')
 
   const isTrashView = computed(() => selectedView.value === RECENTLY_DELETED)
@@ -42,14 +54,51 @@ export const useNotesStore = defineStore('notes', () => {
     return folders.value[0]?.id ?? null
   })
 
+  // ---- helpers ----
+
+  function sortNotes(): void {
+    notes.value.sort(
+      (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt || b.id - a.id
+    )
+  }
+
+  /** Remove notes from the in-memory lists by id (keeps remaining objects' identity). */
+  function removeLocal(ids: number[]): void {
+    const set = new Set(ids)
+    notes.value = notes.value.filter((n) => !set.has(n.id))
+    searchHits.value = searchHits.value.filter((n) => !set.has(n.id))
+  }
+
+  /** Set the single active selection. */
+  function setActive(id: number | null): void {
+    selectedNoteId.value = id
+    selectedNoteIds.value = id == null ? [] : [id]
+    selectionAnchor.value = id
+  }
+
+  /** After removals, drop stale ids and keep a valid active note (falls back to the first). */
+  function ensureSelection(): void {
+    const visible = visibleNotes.value
+    selectedNoteIds.value = selectedNoteIds.value.filter((id) => visible.some((n) => n.id === id))
+    if (!selectedNoteIds.value.length) {
+      setActive(visible[0]?.id ?? null)
+    } else if (!visible.some((n) => n.id === selectedNoteId.value)) {
+      selectedNoteId.value = selectedNoteIds.value[selectedNoteIds.value.length - 1]
+    }
+  }
+
   // ---- loaders ----
 
   async function loadFolders(): Promise<void> {
     folders.value = await window.api.folders.list()
   }
 
+  /** Merge fresh counts into the existing object (no top-level replacement → less re-render). */
   async function loadCounts(): Promise<void> {
-    counts.value = await window.api.notes.counts()
+    const c = await window.api.notes.counts()
+    counts.value.all = c.all
+    counts.value.trash = c.trash
+    counts.value.byFolder = c.byFolder
   }
 
   async function loadNotes(): Promise<void> {
@@ -59,12 +108,10 @@ export const useNotesStore = defineStore('notes', () => {
     else notes.value = await window.api.notes.listByFolder(selectedView.value)
   }
 
-  /** Reload the visible list + counts, preserving selection when the note still exists. */
+  /** Full reload — used only on view change, where the whole pane changes anyway. */
   async function refresh(): Promise<void> {
     await Promise.all([loadNotes(), loadCounts()])
-    if (!visibleNotes.value.some((n) => n.id === selectedNoteId.value)) {
-      selectedNoteId.value = visibleNotes.value[0]?.id ?? null
-    }
+    ensureSelection()
   }
 
   async function init(): Promise<void> {
@@ -77,18 +124,45 @@ export const useNotesStore = defineStore('notes', () => {
   // ---- navigation ----
 
   async function selectView(view: ViewId): Promise<void> {
+    flushPending()
     selectedView.value = view
     searchQuery.value = ''
     searchHits.value = []
-    selectedNoteId.value = null
+    setActive(null)
     await refresh()
     // eslint-disable-next-line no-console
     console.info(`[notes.store] view -> ${String(view)}`)
   }
 
-  function selectNote(id: number): void {
-    if (id !== selectedNoteId.value) flushPending() // save the note we're leaving
+  // ---- selection (single / ctrl-toggle / shift-range) ----
+
+  function selectSingle(id: number): void {
+    flushPending() // save the note we're leaving
+    setActive(id)
+  }
+
+  function toggleSelect(id: number): void {
+    flushPending()
+    const i = selectedNoteIds.value.indexOf(id)
+    selectedNoteIds.value =
+      i === -1 ? [...selectedNoteIds.value, id] : selectedNoteIds.value.filter((x) => x !== id)
+    selectedNoteId.value = selectedNoteIds.value.length ? id : null
+    selectionAnchor.value = id
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] toggle-select note=${id} -> ${selectedNoteIds.value.length} selected`)
+  }
+
+  function selectRange(id: number): void {
+    flushPending()
+    const ids = visibleNotes.value.map((n) => n.id)
+    const a = ids.indexOf(selectionAnchor.value ?? id)
+    const b = ids.indexOf(id)
+    if (a === -1 || b === -1) return setActive(id)
+    const [lo, hi] = a < b ? [a, b] : [b, a]
+    selectedNoteIds.value = ids.slice(lo, hi + 1)
     selectedNoteId.value = id
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] range-select -> ${selectedNoteIds.value.length} selected`)
   }
 
   // ---- search ----
@@ -97,26 +171,26 @@ export const useNotesStore = defineStore('notes', () => {
     searchQuery.value = query
     if (!query.trim()) {
       searchHits.value = []
+      ensureSelection()
       return
     }
     searchHits.value = await window.api.search.query(query)
-    if (!searchHits.value.some((n) => n.id === selectedNoteId.value)) {
-      selectedNoteId.value = searchHits.value[0]?.id ?? null
-    }
+    ensureSelection()
   }
 
-  // ---- note mutations ----
+  // ---- note mutations (in-place) ----
 
   async function createNote(): Promise<void> {
     const folderId = targetFolderId.value
     if (folderId == null) return
     const note = await window.api.notes.create(folderId)
-    // Creating from "All Notes" / search should land us in that note's view context.
-    if (typeof selectedView.value !== 'number') selectedView.value = folderId
     searchQuery.value = ''
     searchHits.value = []
-    await refresh()
-    selectedNoteId.value = note.id
+    notes.value.unshift(note)
+    sortNotes()
+    setActive(note.id)
+    editorFocusTick.value++ // new note → focus the editor for immediate typing
+    await loadCounts()
     // eslint-disable-next-line no-console
     console.info(`[notes.store] create note=${note.id}`)
   }
@@ -127,7 +201,6 @@ export const useNotesStore = defineStore('notes', () => {
   async function persist(p: { id: number; html: string; text: string }): Promise<void> {
     try {
       patchLocal(await window.api.notes.update(p.id, p.html, p.text))
-      await loadCounts()
       // eslint-disable-next-line no-console
       console.info(`[notes.store] autosave note=${p.id} len=${p.text.length}`)
     } catch (err) {
@@ -164,46 +237,87 @@ export const useNotesStore = defineStore('notes', () => {
     }, AUTOSAVE_MS)
   }
 
-  /** Replace a note in-place and re-sort the live list so title/snippet/order update live. */
+  /** Replace a note's fields in-place and re-sort so title/snippet/order update live. */
   function patchLocal(updated: Note): void {
-    const idx = notes.value.findIndex((n) => n.id === updated.id)
-    if (idx !== -1) notes.value[idx] = updated
-    const sidx = searchHits.value.findIndex((n) => n.id === updated.id)
-    if (sidx !== -1) searchHits.value[sidx] = { ...searchHits.value[sidx], ...updated }
-    notes.value.sort(
-      (a, b) =>
-        Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt || b.id - a.id
-    )
+    const target = notes.value.find((n) => n.id === updated.id)
+    if (target) Object.assign(target, updated)
+    const hit = searchHits.value.find((n) => n.id === updated.id)
+    if (hit) Object.assign(hit, updated)
+    sortNotes()
   }
 
   async function setPinned(id: number, pinned: boolean): Promise<void> {
     await window.api.notes.setPinned(id, pinned)
-    await refresh()
+    const n = notes.value.find((x) => x.id === id)
+    if (n) n.pinned = pinned
+    const h = searchHits.value.find((x) => x.id === id)
+    if (h) h.pinned = pinned
+    sortNotes()
   }
 
   async function moveNote(id: number, folderId: number): Promise<void> {
     await window.api.notes.move(id, folderId)
-    await refresh()
+    const n = notes.value.find((x) => x.id === id)
+    if (n) n.folderId = folderId
+    // Leaving a specific-folder view? Then it no longer belongs in this list.
+    if (typeof selectedView.value === 'number' && selectedView.value !== folderId) {
+      removeLocal([id])
+      ensureSelection()
+    }
+    await loadCounts()
+  }
+
+  // single-item wrappers delegate to the batch versions
+
+  async function trashSelected(): Promise<void> {
+    const ids = [...selectedNoteIds.value]
+    if (!ids.length) return
+    for (const id of ids) await window.api.notes.trash(id)
+    removeLocal(ids)
+    ensureSelection()
+    await loadCounts()
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] trashed ${ids.length} note(s): ${ids.join(',')}`)
+  }
+
+  async function hardDeleteSelected(): Promise<void> {
+    const ids = [...selectedNoteIds.value]
+    if (!ids.length) return
+    for (const id of ids) await window.api.notes.hardDelete(id)
+    removeLocal(ids)
+    ensureSelection()
+    await loadCounts()
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] permanently deleted ${ids.length} note(s)`)
   }
 
   async function trashNote(id: number): Promise<void> {
     await window.api.notes.trash(id)
-    await refresh()
+    removeLocal([id])
+    ensureSelection()
+    await loadCounts()
   }
 
   async function restoreNote(id: number): Promise<void> {
     await window.api.notes.restore(id)
-    await refresh()
+    removeLocal([id])
+    ensureSelection()
+    await loadCounts()
   }
 
   async function hardDeleteNote(id: number): Promise<void> {
     await window.api.notes.hardDelete(id)
-    await refresh()
+    removeLocal([id])
+    ensureSelection()
+    await loadCounts()
   }
 
   async function emptyTrash(): Promise<void> {
     await window.api.notes.emptyTrash()
-    await refresh()
+    notes.value = []
+    searchHits.value = []
+    setActive(null)
+    await loadCounts()
   }
 
   // ---- folder mutations ----
@@ -233,7 +347,9 @@ export const useNotesStore = defineStore('notes', () => {
     counts,
     selectedView,
     selectedNoteId,
+    selectedNoteIds,
     searchQuery,
+    editorFocusTick,
     // getters
     isTrashView,
     isSearching,
@@ -243,7 +359,9 @@ export const useNotesStore = defineStore('notes', () => {
     // actions
     init,
     selectView,
-    selectNote,
+    selectSingle,
+    toggleSelect,
+    selectRange,
     setSearch,
     createNote,
     saveNoteContent,
@@ -251,8 +369,10 @@ export const useNotesStore = defineStore('notes', () => {
     setPinned,
     moveNote,
     trashNote,
+    trashSelected,
     restoreNote,
     hardDeleteNote,
+    hardDeleteSelected,
     emptyTrash,
     createFolder,
     renameFolder,

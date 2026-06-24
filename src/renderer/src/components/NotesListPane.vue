@@ -24,6 +24,13 @@ const headerTitle = computed(() => {
   return t('sidebar.all_notes')
 })
 
+// macOS-style selection: plain click = single, Cmd/Ctrl+click = toggle, Shift+click = range.
+function onRowClick(e: MouseEvent, id: number): void {
+  if (e.shiftKey) store.selectRange(id)
+  else if (e.ctrlKey || e.metaKey) store.toggleSelect(id)
+  else store.selectSingle(id)
+}
+
 function titleOf(note: Note): string {
   return note.title || t('list.untitled')
 }
@@ -113,8 +120,11 @@ async function emptyTrash(): Promise<void> {
         v-for="note in store.visibleNotes"
         :key="note.id"
         class="row"
-        :class="{ 'is-active': note.id === store.selectedNoteId }"
-        @click="store.selectNote(note.id)"
+        :class="{
+          'is-active': store.selectedNoteIds.includes(note.id),
+          'is-focused': note.id === store.selectedNoteId
+        }"
+        @click="onRowClick($event, note.id)"
       >
         <div class="row__head">
           <span v-if="note.pinned" class="row__pin">📌</span>
@@ -213,7 +223,12 @@ async function emptyTrash(): Promise<void> {
 .list__scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 6px;
+  /* gap separates rows so adjacent selected notes don't merge into one block;
+     extra bottom padding gives breathing room after the last note. */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 6px 16px;
 }
 .list__empty {
   display: flex;
@@ -249,6 +264,9 @@ async function emptyTrash(): Promise<void> {
 }
 .row.is-active {
   background: var(--bn-selection);
+}
+.row.is-focused {
+  background: var(--bn-selection-strong);
 }
 .row__head {
   display: flex;

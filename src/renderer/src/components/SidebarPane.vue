@@ -76,7 +76,8 @@ async function deleteFolder(id: number): Promise<void> {
       <button
         v-for="folder in store.folders"
         :key="folder.id"
-        class="sidebar__item"
+        class="sidebar__item sidebar__folder"
+        :data-folder-id="folder.id"
         :class="{ 'is-active': store.selectedView === folder.id }"
         @click="store.selectView(folder.id)"
         @dblclick="renameFolder(folder.id, folder.name)"

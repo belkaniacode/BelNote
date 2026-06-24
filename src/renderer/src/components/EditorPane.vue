@@ -24,11 +24,12 @@ function onChange(payload: { html: string; text: string }): void {
     <template v-if="note">
       <div class="editor-pane__meta">{{ t('editor.edited', { when: relativeDate(note.updatedAt) }) }}</div>
       <div class="editor-pane__body">
-        <!-- :key remounts the editor with fresh content when the selected note changes. -->
+        <!-- Single reused editor instance; content is swapped via a watch in NoteEditor.
+             focus-signal bumps only on note creation, so selection never steals keyboard focus. -->
         <NoteEditor
-          :key="note.id"
           :content="note.contentHtml"
           :editable="editable"
+          :focus-signal="store.editorFocusTick"
           @change="onChange"
         />
       </div>
@@ -49,10 +50,10 @@ function onChange(payload: { html: string; text: string }): void {
   height: 100%;
 }
 .editor-pane__meta {
-  text-align: center;
+  text-align: left;
   font-size: 11.5px;
   color: var(--bn-text-faint);
-  padding: 10px 0 4px;
+  padding: 10px 0 4px 48px;
 }
 .editor-pane__body {
   flex: 1;
@@ -60,7 +61,9 @@ function onChange(payload: { html: string; text: string }): void {
   padding: 4px 48px 24px;
   max-width: 820px;
   width: 100%;
-  margin: 0 auto;
+  /* Left-align the content; do NOT center it (margin:0, not 0 auto) so widening the
+     window keeps the text on the left instead of drifting toward the middle. */
+  margin: 0;
 }
 .editor-pane__empty {
   flex: 1;
