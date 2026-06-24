@@ -92,6 +92,12 @@ body,
 #app {
   margin: 0;
   height: 100%;
+  /* The app is a fixed full-height layout; all scrolling happens inside its own panes
+     (.sidebar__nav, .list__scroll, .note-editor__content). The body itself must NEVER scroll.
+     Without this, Element Plus teleports poppers/dialogs to <body>; when one extends past the
+     viewport the body gains a scrollbar (or gets scrollbar-compensation padding), shifting the
+     whole app sideways — the "left sidebar jerk" seen when opening the row menu to pin/delete. */
+  overflow: hidden;
 }
 
 body {
