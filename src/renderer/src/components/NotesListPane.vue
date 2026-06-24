@@ -307,10 +307,21 @@ async function emptyTrash(): Promise<void> {
   position: absolute;
   top: 8px;
   right: 8px;
-  display: none;
+  /* Keep the dropdown trigger in layout (just invisible) instead of display:none. The trigger
+     anchors the Element Plus dropdown popper. With display:none, the instant you click "Pin"
+     the note re-sorts and slides out from under the cursor → the row loses :hover → the trigger
+     collapses to a 0×0 rect → Floating-UI repositions the (closing) popper to the viewport
+     origin, painting a full-size menu in the TOP-LEFT corner for a frame. visibility:hidden
+     keeps a valid bounding rect at all times, so the popper can never anchor to the origin.
+     (position:absolute, so staying laid out costs no row layout; visibility:hidden also drops
+     pointer events, so clicks still pass through to the row.) */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--bn-transition);
 }
 .row:hover .row__actions {
-  display: block;
+  visibility: visible;
+  opacity: 1;
 }
 .row__more {
   color: var(--bn-text-muted);

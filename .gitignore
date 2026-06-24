@@ -11,3 +11,5 @@ dist/
 .ai-factory.json
 .claude
 .code-review-graph
+# Playwright MCP scratch output
+.playwright-mcp/
