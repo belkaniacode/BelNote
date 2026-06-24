@@ -8,6 +8,7 @@
     "rename": "Rename",
     "delete": "Delete",
     "delete_folder_confirm": "Delete this folder and all its notes?",
+    "delete_folders_confirm": "Delete {count} folders and all their notes?",
     "new_folder_name": "New folder name"
   },
   "list": {

@@ -34,6 +34,15 @@ async function onFolderDrop(folderId: number): Promise<void> {
   if (ids.length) await store.moveNotes(ids, folderId)
 }
 
+// macOS-style folder selection: plain click navigates (and clears any multi-selection),
+// Cmd/Ctrl+click toggles a folder in the batch selection, Shift+click selects a range.
+// Batch-selected folders are deleted together with the Delete key (see App.vue).
+function onFolderClick(e: MouseEvent, id: number): void {
+  if (e.shiftKey) store.selectFolderRange(id)
+  else if (e.ctrlKey || e.metaKey) store.toggleSelectFolder(id)
+  else store.selectView(id)
+}
+
 async function newFolder(): Promise<void> {
   try {
     const { value } = await ElMessageBox.prompt(t('sidebar.new_folder_name'), t('sidebar.new_folder'), {
@@ -101,8 +110,12 @@ async function deleteFolder(id: number): Promise<void> {
         :key="folder.id"
         class="sidebar__item sidebar__folder"
         :data-folder-id="folder.id"
-        :class="{ 'is-active': store.selectedView === folder.id, 'is-drop-target': dropTargetId === folder.id }"
-        @click="store.selectView(folder.id)"
+        :class="{
+          'is-active': store.selectedView === folder.id,
+          'is-multi-selected': store.selectedFolderIds.includes(folder.id),
+          'is-drop-target': dropTargetId === folder.id
+        }"
+        @click="onFolderClick($event, folder.id)"
         @dblclick="renameFolder(folder.id, folder.name)"
         @dragover="onFolderDragOver($event, folder.id)"
         @dragleave="onFolderDragLeave($event, folder.id)"
@@ -171,6 +184,11 @@ async function deleteFolder(id: number): Promise<void> {
 .sidebar__item.is-active {
   background: var(--bn-selection);
   color: var(--bn-accent-strong);
+}
+/* Folders included in a multi-selection (Ctrl/Shift-click) awaiting a batch Delete. */
+.sidebar__folder.is-multi-selected {
+  background: var(--bn-selection);
+  box-shadow: inset 0 0 0 1.5px var(--bn-accent);
 }
 /* Highlight a folder while a dragged note hovers over it (macOS Notes-style move target). */
 .sidebar__folder.is-drop-target {

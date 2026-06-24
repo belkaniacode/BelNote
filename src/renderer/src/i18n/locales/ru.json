@@ -8,6 +8,7 @@
     "rename": "Переименовать",
     "delete": "Удалить",
     "delete_folder_confirm": "Удалить эту папку и все её заметки?",
+    "delete_folders_confirm": "Удалить {count} папок(и) и все их заметки?",
     "new_folder_name": "Название папки"
   },
   "list": {

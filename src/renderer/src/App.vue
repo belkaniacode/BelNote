@@ -24,30 +24,54 @@ function isTypingTarget(el: Element | null): boolean {
   )
 }
 
-// Global Delete/Backspace: remove the selected notes (or the focused folder). Ignored while
-// editing text, and never fires while a confirmation dialog is open.
+// Global keyboard shortcuts. All ignored while editing text (the editor owns its own text
+// undo/redo and the Delete key) and while a confirmation dialog is open.
 async function onKeydown(e: KeyboardEvent): Promise<void> {
-  if (e.key !== 'Delete' && e.key !== 'Backspace') return
   const el = document.activeElement
+  const mod = e.ctrlKey || e.metaKey
+
+  // Undo / redo for deletions — keyboard only, no buttons. Ctrl/Cmd+Z = undo,
+  // Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y = redo. Skipped inside the editor so text undo still works.
+  if (mod && ['z', 'y'].includes(e.key.toLowerCase())) {
+    if (isTypingTarget(el)) return
+    if (document.querySelector('.el-overlay')) return
+    e.preventDefault()
+    const isRedo = e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)
+    if (isRedo) await store.redo()
+    else await store.undo()
+    return
+  }
+
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return
   if (isTypingTarget(el)) return
   if (document.querySelector('.el-overlay')) return // a dialog is open
 
-  // 1) A focused sidebar folder → delete that folder (with confirm).
-  const folderEl = el?.closest<HTMLElement>('.sidebar__folder')
-  if (folderEl?.dataset.folderId) {
-    e.preventDefault()
-    const id = Number(folderEl.dataset.folderId)
-    try {
-      await ElMessageBox.confirm(t('sidebar.delete_folder_confirm'), t('sidebar.delete'), {
-        type: 'warning',
-        confirmButtonText: t('sidebar.delete'),
-        cancelButtonText: t('common.cancel')
-      })
-      await store.deleteFolder(id)
-    } catch {
-      /* cancelled */
+  // 1) Focus in the sidebar → delete the multi-selected folders, or the focused one (with confirm).
+  if (el?.closest('.sidebar')) {
+    const focused = el.closest<HTMLElement>('.sidebar__folder')?.dataset.folderId
+    const ids = store.selectedFolderIds.length
+      ? [...store.selectedFolderIds]
+      : focused
+        ? [Number(focused)]
+        : []
+    if (ids.length) {
+      e.preventDefault()
+      try {
+        const message =
+          ids.length > 1
+            ? t('sidebar.delete_folders_confirm', { count: ids.length })
+            : t('sidebar.delete_folder_confirm')
+        await ElMessageBox.confirm(message, t('sidebar.delete'), {
+          type: 'warning',
+          confirmButtonText: t('sidebar.delete'),
+          cancelButtonText: t('common.cancel')
+        })
+        await store.deleteFolders(ids)
+      } catch {
+        /* cancelled */
+      }
+      return
     }
-    return
   }
 
   // 2) Selected notes → trash them (or permanently delete in the trash view, with confirm).

@@ -40,6 +40,17 @@ export const useNotesStore = defineStore('notes', () => {
   // Notes currently being dragged (note rows → sidebar folder). Lets the sidebar know a
   // note-move drag is in progress so only folders highlight as drop targets. Empty when idle.
   const draggingNoteIds = ref<number[]>([])
+  // Multi-selected folders (Ctrl/Shift-click in the sidebar) for batch delete — independent of
+  // `selectedView` (which folder's notes are shown). `folderAnchor` drives shift-range select.
+  const selectedFolderIds = ref<number[]>([])
+  const folderAnchor = ref<number | null>(null)
+
+  // Undo/redo command stack for destructive actions (note trash, folder delete). Each entry
+  // knows how to reverse itself and re-apply itself; keyboard-only (see App.vue). "Delete
+  // forever" and emptying the trash are intentionally NOT undoable.
+  type UndoEntry = { undo: () => Promise<void>; redo: () => Promise<void> }
+  const undoStack = ref<UndoEntry[]>([])
+  const redoStack = ref<UndoEntry[]>([])
 
   const isTrashView = computed(() => selectedView.value === RECENTLY_DELETED)
   const isSearching = computed(() => searchQuery.value.trim().length > 0)
@@ -128,6 +139,7 @@ export const useNotesStore = defineStore('notes', () => {
 
   async function selectView(view: ViewId): Promise<void> {
     flushPending()
+    clearFolderSelection() // navigating away drops any folder multi-selection
     selectedView.value = view
     searchQuery.value = ''
     searchHits.value = []
@@ -301,6 +313,16 @@ export const useNotesStore = defineStore('notes', () => {
     removeLocal(ids)
     ensureSelection()
     await loadCounts()
+    pushUndo({
+      undo: async () => {
+        for (const id of ids) await window.api.notes.restore(id)
+        await refresh()
+      },
+      redo: async () => {
+        for (const id of ids) await window.api.notes.trash(id)
+        await refresh()
+      }
+    })
     // eslint-disable-next-line no-console
     console.info(`[FIX] trashed ${ids.length} note(s): ${ids.join(',')}`)
   }
@@ -321,6 +343,16 @@ export const useNotesStore = defineStore('notes', () => {
     removeLocal([id])
     ensureSelection()
     await loadCounts()
+    pushUndo({
+      undo: async () => {
+        await window.api.notes.restore(id)
+        await refresh()
+      },
+      redo: async () => {
+        await window.api.notes.trash(id)
+        await refresh()
+      }
+    })
   }
 
   async function restoreNote(id: number): Promise<void> {
@@ -345,6 +377,67 @@ export const useNotesStore = defineStore('notes', () => {
     await loadCounts()
   }
 
+  // ---- undo / redo ----
+
+  function pushUndo(entry: UndoEntry): void {
+    undoStack.value.push(entry)
+    redoStack.value = [] // a new action invalidates the redo history
+    if (undoStack.value.length > 50) undoStack.value.shift()
+  }
+
+  async function undo(): Promise<void> {
+    const entry = undoStack.value.pop()
+    if (!entry) return
+    await entry.undo()
+    redoStack.value.push(entry)
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] undo (stack: ${undoStack.value.length} undo / ${redoStack.value.length} redo)`)
+  }
+
+  async function redo(): Promise<void> {
+    const entry = redoStack.value.pop()
+    if (!entry) return
+    await entry.redo()
+    undoStack.value.push(entry)
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] redo (stack: ${undoStack.value.length} undo / ${redoStack.value.length} redo)`)
+  }
+
+  // ---- folder selection (Ctrl-toggle / Shift-range; plain navigation clears it) ----
+
+  function clearFolderSelection(): void {
+    selectedFolderIds.value = []
+    folderAnchor.value = null
+  }
+
+  function toggleSelectFolder(id: number): void {
+    const i = selectedFolderIds.value.indexOf(id)
+    selectedFolderIds.value =
+      i === -1 ? [...selectedFolderIds.value, id] : selectedFolderIds.value.filter((x) => x !== id)
+    folderAnchor.value = id
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] toggle-select folder=${id} -> ${selectedFolderIds.value.length} selected`)
+  }
+
+  function selectFolderRange(id: number): void {
+    const ids = folders.value.map((f) => f.id)
+    // Anchor on the last toggled folder, else the currently-viewed folder (so a plain click
+    // followed by Shift+click extends a range), else the clicked folder itself.
+    const anchor =
+      folderAnchor.value ?? (typeof selectedView.value === 'number' ? selectedView.value : id)
+    const a = ids.indexOf(anchor)
+    const b = ids.indexOf(id)
+    if (a === -1 || b === -1) {
+      selectedFolderIds.value = [id]
+      folderAnchor.value = id
+      return
+    }
+    const [lo, hi] = a < b ? [a, b] : [b, a]
+    selectedFolderIds.value = ids.slice(lo, hi + 1)
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] range-select folders -> ${selectedFolderIds.value.length} selected`)
+  }
+
   // ---- folder mutations ----
 
   async function createFolder(name: string): Promise<void> {
@@ -358,11 +451,55 @@ export const useNotesStore = defineStore('notes', () => {
     await loadFolders()
   }
 
+  // Delete one or more folders (cascades to their notes). Undoable: the folder + its notes are
+  // snapshotted before deletion and recreated on undo (with new ids — content/pin preserved).
+  async function deleteFolders(ids: number[]): Promise<void> {
+    const present = ids.filter((id) => folders.value.some((f) => f.id === id))
+    if (!present.length) return
+    // Snapshot each folder and its notes before the cascade delete.
+    const snaps: { name: string; notes: { html: string; text: string; pinned: boolean }[] }[] = []
+    for (const id of present) {
+      const f = folders.value.find((x) => x.id === id)!
+      const folderNotes = await window.api.notes.listByFolder(id)
+      snaps.push({
+        name: f.name,
+        notes: folderNotes.map((n) => ({ html: n.contentHtml, text: n.contentText, pinned: n.pinned }))
+      })
+    }
+    let liveIds = [...present]
+    const doDelete = async (): Promise<void> => {
+      for (const id of liveIds) await window.api.folders.delete(id)
+      await loadFolders()
+      if (typeof selectedView.value === 'number' && liveIds.includes(selectedView.value)) {
+        await selectView(ALL_NOTES)
+      } else {
+        await loadCounts()
+      }
+      clearFolderSelection()
+    }
+    const restore = async (): Promise<void> => {
+      const newIds: number[] = []
+      for (const s of snaps) {
+        const f = await window.api.folders.create(s.name)
+        newIds.push(f.id)
+        for (const n of s.notes) {
+          const created = await window.api.notes.create(f.id)
+          await window.api.notes.update(created.id, n.html, n.text)
+          if (n.pinned) await window.api.notes.setPinned(created.id, true)
+        }
+      }
+      liveIds = newIds // redo must target the recreated folders
+      await loadFolders()
+      await refresh()
+    }
+    await doDelete()
+    pushUndo({ undo: restore, redo: doDelete })
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] deleted ${present.length} folder(s): ${present.join(',')}`)
+  }
+
   async function deleteFolder(id: number): Promise<void> {
-    await window.api.folders.delete(id)
-    await loadFolders()
-    if (selectedView.value === id) await selectView(ALL_NOTES)
-    else await loadCounts()
+    await deleteFolders([id])
   }
 
   return {
@@ -376,6 +513,7 @@ export const useNotesStore = defineStore('notes', () => {
     searchQuery,
     editorFocusTick,
     draggingNoteIds,
+    selectedFolderIds,
     // getters
     isTrashView,
     isSearching,
@@ -397,6 +535,12 @@ export const useNotesStore = defineStore('notes', () => {
     moveNotes,
     startDraggingNotes,
     endDraggingNotes,
+    undo,
+    redo,
+    toggleSelectFolder,
+    selectFolderRange,
+    clearFolderSelection,
+    deleteFolders,
     trashNote,
     trashSelected,
     restoreNote,
