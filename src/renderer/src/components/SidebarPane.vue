@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { Document, Folder, Delete, Plus } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -8,6 +9,30 @@ import AppControls from './AppControls.vue'
 
 const { t } = useI18n()
 const store = useNotesStore()
+
+// Folder currently highlighted as a drop target during a note drag (see NotesListPane).
+const dropTargetId = ref<number | null>(null)
+
+function onFolderDragOver(e: DragEvent, folderId: number): void {
+  if (!store.draggingNoteIds.length) return // not a note drag — ignore
+  e.preventDefault() // allow the drop
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  dropTargetId.value = folderId
+}
+
+function onFolderDragLeave(e: DragEvent, folderId: number): void {
+  // Ignore leaves into child elements of the same button; only clear when truly leaving it.
+  const related = e.relatedTarget as Node | null
+  if ((e.currentTarget as HTMLElement).contains(related)) return
+  if (dropTargetId.value === folderId) dropTargetId.value = null
+}
+
+async function onFolderDrop(folderId: number): Promise<void> {
+  dropTargetId.value = null
+  const ids = [...store.draggingNoteIds]
+  store.endDraggingNotes()
+  if (ids.length) await store.moveNotes(ids, folderId)
+}
 
 async function newFolder(): Promise<void> {
   try {
@@ -78,9 +103,12 @@ async function deleteFolder(id: number): Promise<void> {
         :key="folder.id"
         class="sidebar__item sidebar__folder"
         :data-folder-id="folder.id"
-        :class="{ 'is-active': store.selectedView === folder.id }"
+        :class="{ 'is-active': store.selectedView === folder.id, 'is-drop-target': dropTargetId === folder.id }"
         @click="store.selectView(folder.id)"
         @dblclick="renameFolder(folder.id, folder.name)"
+        @dragover="onFolderDragOver($event, folder.id)"
+        @dragleave="onFolderDragLeave($event, folder.id)"
+        @drop="onFolderDrop(folder.id)"
       >
         <el-icon class="sidebar__icon"><Folder /></el-icon>
         <span class="sidebar__label">{{ folder.name }}</span>
@@ -152,6 +180,12 @@ async function deleteFolder(id: number): Promise<void> {
 .sidebar__item.is-active {
   background: var(--bn-selection);
   color: var(--bn-accent-strong);
+}
+/* Highlight a folder while a dragged note hovers over it (macOS Notes-style move target). */
+.sidebar__folder.is-drop-target {
+  background: var(--bn-selection-strong);
+  color: var(--bn-accent-strong);
+  box-shadow: inset 0 0 0 2px var(--bn-accent);
 }
 .sidebar__icon {
   color: var(--bn-accent);

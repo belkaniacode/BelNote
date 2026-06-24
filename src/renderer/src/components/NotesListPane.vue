@@ -42,7 +42,20 @@ function snippetOf(note: Note): string {
 async function onAction(command: string, note: Note): Promise<void> {
   if (command === 'pin') await store.setPinned(note.id, !note.pinned)
   else if (command === 'delete') await store.trashNote(note.id)
-  else if (command.startsWith('move:')) await store.moveNote(note.id, Number(command.slice(5)))
+}
+
+// Drag a note (or the whole multi-selection) onto a sidebar folder to move it — macOS Notes
+// style. If the dragged note isn't part of the current selection, drag just that one.
+function onDragStart(e: DragEvent, id: number): void {
+  if (!store.selectedNoteIds.includes(id)) store.selectSingle(id)
+  const ids = store.selectedNoteIds.length ? [...store.selectedNoteIds] : [id]
+  store.startDraggingNotes(ids)
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', ids.join(','))
+  }
+  // eslint-disable-next-line no-console
+  console.info(`[FIX] drag-start notes: ${ids.join(',')}`)
 }
 
 async function deleteForever(note: Note): Promise<void> {
@@ -124,7 +137,10 @@ async function emptyTrash(): Promise<void> {
           'is-active': store.selectedNoteIds.includes(note.id),
           'is-focused': note.id === store.selectedNoteId
         }"
+        :draggable="!store.isTrashView"
         @click="onRowClick($event, note.id)"
+        @dragstart="onDragStart($event, note.id)"
+        @dragend="store.endDraggingNotes()"
       >
         <div class="row__head">
           <span v-if="note.pinned" class="row__pin">📌</span>
@@ -149,13 +165,6 @@ async function emptyTrash(): Promise<void> {
             <el-dropdown-menu>
               <el-dropdown-item command="pin">
                 {{ note.pinned ? t('list.unpin') : t('list.pin') }}
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-for="f in store.folders.filter((f) => f.id !== note.folderId)"
-                :key="f.id"
-                :command="`move:${f.id}`"
-              >
-                {{ t('list.move_to') }} {{ f.name }}
               </el-dropdown-item>
               <el-dropdown-item command="delete" divided>{{ t('list.delete') }}</el-dropdown-item>
             </el-dropdown-menu>

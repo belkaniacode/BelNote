@@ -37,6 +37,9 @@ export const useNotesStore = defineStore('notes', () => {
   const selectedNoteId = ref<number | null>(null)
   const selectionAnchor = ref<number | null>(null)
   const searchQuery = ref('')
+  // Notes currently being dragged (note rows → sidebar folder). Lets the sidebar know a
+  // note-move drag is in progress so only folders highlight as drop targets. Empty when idle.
+  const draggingNoteIds = ref<number[]>([])
 
   const isTrashView = computed(() => selectedView.value === RECENTLY_DELETED)
   const isSearching = computed(() => searchQuery.value.trim().length > 0)
@@ -255,16 +258,38 @@ export const useNotesStore = defineStore('notes', () => {
     sortNotes()
   }
 
-  async function moveNote(id: number, folderId: number): Promise<void> {
-    await window.api.notes.move(id, folderId)
-    const n = notes.value.find((x) => x.id === id)
-    if (n) n.folderId = folderId
-    // Leaving a specific-folder view? Then it no longer belongs in this list.
+  // Move one or more notes into a folder (used by drag-and-drop onto a sidebar folder).
+  async function moveNotes(ids: number[], folderId: number): Promise<void> {
+    const moved = ids.filter((id) => {
+      const n = notes.value.find((x) => x.id === id)
+      return n && n.folderId !== folderId
+    })
+    if (!moved.length) return
+    for (const id of moved) {
+      await window.api.notes.move(id, folderId)
+      const n = notes.value.find((x) => x.id === id)
+      if (n) n.folderId = folderId
+    }
+    // Leaving a specific-folder view? Those notes no longer belong in this list.
     if (typeof selectedView.value === 'number' && selectedView.value !== folderId) {
-      removeLocal([id])
+      removeLocal(moved)
       ensureSelection()
     }
     await loadCounts()
+    // eslint-disable-next-line no-console
+    console.info(`[FIX] moved ${moved.length} note(s) -> folder ${folderId}: ${moved.join(',')}`)
+  }
+
+  async function moveNote(id: number, folderId: number): Promise<void> {
+    await moveNotes([id], folderId)
+  }
+
+  // ---- Drag-and-drop state (note rows → sidebar folders) ----
+  function startDraggingNotes(ids: number[]): void {
+    draggingNoteIds.value = [...ids]
+  }
+  function endDraggingNotes(): void {
+    draggingNoteIds.value = []
   }
 
   // single-item wrappers delegate to the batch versions
@@ -350,6 +375,7 @@ export const useNotesStore = defineStore('notes', () => {
     selectedNoteIds,
     searchQuery,
     editorFocusTick,
+    draggingNoteIds,
     // getters
     isTrashView,
     isSearching,
@@ -368,6 +394,9 @@ export const useNotesStore = defineStore('notes', () => {
     flushPending,
     setPinned,
     moveNote,
+    moveNotes,
+    startDraggingNotes,
+    endDraggingNotes,
     trashNote,
     trashSelected,
     restoreNote,
