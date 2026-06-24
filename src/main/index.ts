@@ -1,5 +1,7 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, nativeTheme } from 'electron'
 import { join } from 'path'
+import { registerIpc } from './ipc'
+import { closeDb } from './db'
 
 // Open http(s)/mailto links from the renderer in the user's real browser / mail client,
 // never inside the app window. This is what makes editor links "open like other apps".
@@ -14,7 +16,9 @@ function createWindow(): void {
     minWidth: 640,
     minHeight: 420,
     show: false,
-    backgroundColor: '#1b1a1f',
+    // Pre-paint background that matches the OS theme so there's no flash before the
+    // renderer applies the user's chosen theme. Tokens: dark #1b1a1f / light #fbfaff.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1b1a1f' : '#fbfaff',
     autoHideMenuBar: true,
     title: 'BelNote',
     webPreferences: {
@@ -47,12 +51,8 @@ function createWindow(): void {
   }
 }
 
-// Renderer can also ask the main process to open a URL explicitly (used by the editor).
-ipcMain.handle('open-external', (_e, url: string) => {
-  if (isExternal(url)) return shell.openExternal(url)
-})
-
 app.whenReady().then(() => {
+  registerIpc() // opens the DB (first getDb) and wires all data + open-external channels
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -62,3 +62,5 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+
+app.on('will-quit', () => closeDb())

@@ -1,9 +1,38 @@
 {
   "app": { "title": "BelNote" },
+  "sidebar": {
+    "all_notes": "Все заметки",
+    "recently_deleted": "Недавно удалённые",
+    "folders": "Папки",
+    "new_folder": "Новая папка",
+    "rename": "Переименовать",
+    "delete": "Удалить",
+    "delete_folder_confirm": "Удалить эту папку и все её заметки?",
+    "new_folder_name": "Название папки"
+  },
+  "list": {
+    "search": "Поиск",
+    "new_note": "Новая заметка",
+    "no_notes": "Нет заметок",
+    "no_notes_hint": "Создайте первую заметку",
+    "no_results": "Ничего не найдено",
+    "untitled": "Новая заметка",
+    "pin": "Закрепить",
+    "unpin": "Открепить",
+    "move_to": "Переместить в…",
+    "delete": "Удалить",
+    "empty_trash": "Очистить",
+    "empty_trash_confirm": "Удалить навсегда все заметки из «Недавно удалённых»?",
+    "restore": "Восстановить",
+    "delete_forever": "Удалить навсегда",
+    "delete_forever_confirm": "Удалить эту заметку навсегда? Это действие необратимо."
+  },
   "editor": {
     "placeholder": "Начните печатать заметку…",
     "title_placeholder": "Заголовок",
-    "edited": "Изменено {when}"
+    "edited": "Изменено {when}",
+    "empty_title": "Выберите заметку",
+    "empty_hint": "Выберите заметку из списка или создайте новую."
   },
   "toolbar": {
     "bold": "Жирный",
@@ -11,8 +40,26 @@
     "code": "Код в строке",
     "code_block": "Блок кода",
     "task_list": "Чек-лист",
+    "heading": "Заголовок",
+    "bullet_list": "Маркированный список",
     "link": "Ссылка",
     "language": "Язык"
   },
-  "demo": { "note_title": "Локальный доступ" }
+  "settings": {
+    "appearance": "Оформление",
+    "theme": "Тема",
+    "theme_light": "Светлая",
+    "theme_dark": "Тёмная",
+    "theme_system": "Системная",
+    "language": "Язык"
+  },
+  "date": {
+    "today": "Сегодня",
+    "yesterday": "Вчера"
+  },
+  "common": {
+    "cancel": "Отмена",
+    "ok": "ОК",
+    "create": "Создать"
+  }
 }

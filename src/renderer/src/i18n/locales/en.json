@@ -1,9 +1,38 @@
 {
   "app": { "title": "BelNote" },
+  "sidebar": {
+    "all_notes": "All Notes",
+    "recently_deleted": "Recently Deleted",
+    "folders": "Folders",
+    "new_folder": "New Folder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "delete_folder_confirm": "Delete this folder and all its notes?",
+    "new_folder_name": "New folder name"
+  },
+  "list": {
+    "search": "Search",
+    "new_note": "New Note",
+    "no_notes": "No Notes",
+    "no_notes_hint": "Create your first note",
+    "no_results": "No matches",
+    "untitled": "New Note",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "move_to": "Move to…",
+    "delete": "Delete",
+    "empty_trash": "Empty",
+    "empty_trash_confirm": "Permanently delete all notes in Recently Deleted?",
+    "restore": "Restore",
+    "delete_forever": "Delete Permanently",
+    "delete_forever_confirm": "Delete this note permanently? This cannot be undone."
+  },
   "editor": {
     "placeholder": "Start typing your note…",
     "title_placeholder": "Title",
-    "edited": "Edited {when}"
+    "edited": "Edited {when}",
+    "empty_title": "Select a note",
+    "empty_hint": "Choose a note from the list or create a new one."
   },
   "toolbar": {
     "bold": "Bold",
@@ -11,8 +40,26 @@
     "code": "Inline code",
     "code_block": "Code block",
     "task_list": "Task list",
+    "heading": "Heading",
+    "bullet_list": "Bulleted list",
     "link": "Link",
     "language": "Language"
   },
-  "demo": { "note_title": "Local access" }
+  "settings": {
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "System",
+    "language": "Language"
+  },
+  "date": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "ok": "OK",
+    "create": "Create"
+  }
 }

@@ -1,26 +1,123 @@
-/* BelNote dark theme tokens — mirrors the flet app's warm dark palette. */
-html.dark,
-:root {
+/*
+ * BelNote design system — "urban lavender".
+ *
+ * Two themes share the same token names so every component styles itself purely
+ * through CSS custom properties. `html.light` and `html.dark` are toggled at runtime
+ * by useTheme(); `:root` defaults to the light palette so the very first paint
+ * (before JS runs) is never a flash of unstyled dark.
+ */
+
+/* ---- Light theme (default) ---- */
+:root,
+html.light {
+  --bn-bg: #fbfaff;
+  --bn-sidebar: #f3f0fb;
+  --bn-list: #ffffff;
+  --bn-surface: #ffffff;
+  --bn-text: #2a2733;
+  --bn-text-muted: #8b8794;
+  --bn-text-faint: #aaa6b4;
+  --bn-divider: #e7e3f2;
+  --bn-accent: #6d51e6;
+  --bn-accent-strong: #5a3fd6;
+  --bn-accent-contrast: #ffffff;
+  --bn-selection: #e7defb;
+  --bn-selection-strong: #d6c7f6;
+  --bn-hover: #f2edfd;
+  --bn-code-bg: #f4f2fb;
+  --bn-shadow: 0 1px 3px rgba(60, 50, 110, 0.08), 0 8px 24px rgba(60, 50, 110, 0.06);
+  --bn-scrollbar: #d8d2ec;
+  color-scheme: light;
+}
+
+/* ---- Dark theme (warm dark + lavender accent) ---- */
+html.dark {
   --bn-bg: #1b1a1f;
   --bn-sidebar: #201f26;
+  --bn-list: #1f1e24;
   --bn-surface: #232228;
   --bn-text: #ece9f1;
   --bn-text-muted: #8b8794;
+  --bn-text-faint: #6b6775;
   --bn-divider: #322f3a;
-  --bn-accent: #b3a7ec;
+  --bn-accent: #b9a8f7;
+  --bn-accent-strong: #cabdfb;
+  --bn-accent-contrast: #1b1a1f;
+  --bn-selection: #383163;
+  --bn-selection-strong: #4b3f86;
+  --bn-hover: #2a2736;
+  --bn-code-bg: #14131a;
+  --bn-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --bn-scrollbar: #3d3947;
+  color-scheme: dark;
+}
+
+/* ---- Shared geometry / typography tokens ---- */
+:root {
+  --bn-radius-sm: 6px;
+  --bn-radius: 10px;
+  --bn-radius-lg: 14px;
+  --bn-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --bn-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --bn-transition: 0.15s ease;
+}
+
+/*
+ * Element Plus accent → lavender. We must override the WHOLE primary ramp, not just
+ * --el-color-primary: EP derives button hover from --el-color-primary-light-3 and active
+ * from --el-color-primary-dark-2. Leaving those at their defaults is what made buttons turn
+ * blue on hover. The ramp is brand-fixed (same in light & dark) so the primary button reads
+ * as a rich, saturated lavender everywhere — not the pale theme accent.
+ */
+:root,
+html.light,
+html.dark {
+  --el-color-primary: #7857f0;
+  --el-color-primary-light-3: #8e72f4; /* button hover */
+  --el-color-primary-light-5: #aa94f7;
+  --el-color-primary-light-7: #ccbcfb;
+  --el-color-primary-light-8: #ddd4fc;
+  --el-color-primary-light-9: #efeafe;
+  --el-color-primary-dark-2: #6242d6; /* button active */
+  --el-border-radius-base: 8px;
+  --el-font-family: var(--bn-font);
 }
 
 * {
   box-sizing: border-box;
 }
+
 html,
 body,
 #app {
   margin: 0;
   height: 100%;
 }
+
 body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--bn-font);
   background: var(--bn-bg);
   color: var(--bn-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background var(--bn-transition), color var(--bn-transition);
+}
+
+/* ---- Slim macOS-like scrollbars ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bn-scrollbar) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--bn-scrollbar);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
