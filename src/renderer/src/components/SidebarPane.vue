@@ -78,8 +78,6 @@ async function deleteFolder(id: number): Promise<void> {
 
 <template>
   <aside class="sidebar">
-    <header class="sidebar__brand">{{ t('app.title') }}</header>
-
     <nav class="sidebar__nav">
       <button
         class="sidebar__item"
@@ -140,14 +138,7 @@ async function deleteFolder(id: number): Promise<void> {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 10px 8px 8px;
-}
-.sidebar__brand {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  padding: 6px 10px 12px;
-  color: var(--bn-text);
+  padding: 14px 8px 8px;
 }
 .sidebar__nav {
   display: flex;
