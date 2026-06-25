@@ -58,7 +58,7 @@ function onChange(payload: { html: string; text: string }): void {
   text-align: left;
   font-size: 11.5px;
   color: var(--bn-text-faint);
-  padding: 10px 0 4px 28px;
+  padding: 10px 0 4px 16px;
 }
 .editor-pane__blank {
   flex: 1;
@@ -69,7 +69,7 @@ function onChange(payload: { html: string; text: string }): void {
   /* min-height:0 so the editor's own scroll area (.note-editor__content) governs scrolling
      instead of this flex child growing to fit a long note. */
   min-height: 0;
-  padding: 4px 28px 24px;
+  padding: 4px 16px 24px;
   max-width: 820px;
   width: 100%;
   /* Left-align the content; do NOT center it (margin:0, not 0 auto) so widening the
