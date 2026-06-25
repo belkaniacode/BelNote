@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "BelNote — fast local Markdown notes (Electron + Vue 3 + TypeScript rewrite)",
   "main": "./out/main/index.js",
-  "author": "belteocode",
+  "author": {
+    "name": "belteocode",
+    "email": "belteosystems@gmail.com"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Folder, Note, SearchHit } from '@shared/types'
 import { ALL_NOTES, RECENTLY_DELETED } from '@shared/types'
+import { loadSession, saveSession } from '../utils/session'
 
 export type ViewId = number | typeof ALL_NOTES | typeof RECENTLY_DELETED
 
@@ -28,6 +29,10 @@ export const useNotesStore = defineStore('notes', () => {
   })
 
   const selectedView = ref<ViewId>(ALL_NOTES)
+  // Async-load state for skeletons / anti-flicker. `loading` is true while a view's notes are
+  // being (re)loaded; `initializing` is true only during the very first hydrate on launch.
+  const loading = ref(false)
+  const initializing = ref(true)
   // Bumped only when a note is freshly created, to tell the editor to grab focus for typing.
   // (Plain selection must NOT focus the editor, or the list loses the Delete-key shortcut.)
   const editorFocusTick = ref(0)
@@ -128,25 +133,55 @@ export const useNotesStore = defineStore('notes', () => {
     ensureSelection()
   }
 
-  async function init(): Promise<void> {
-    await loadFolders()
-    await refresh()
-    // eslint-disable-next-line no-console
-    console.info('[notes.store] initialised')
+  /** Is a persisted/raw view id still valid (a known folder, or one of the sentinels)? */
+  function isValidView(view: number | string): view is ViewId {
+    if (view === ALL_NOTES || view === RECENTLY_DELETED) return true
+    return typeof view === 'number' && folders.value.some((f) => f.id === view)
   }
+
+  async function init(): Promise<void> {
+    initializing.value = true
+    loading.value = true
+    try {
+      await loadFolders()
+      // Restore the last view BEFORE loading notes so the first paint is the right pane.
+      const saved = loadSession()
+      if (saved && isValidView(saved.view)) selectedView.value = saved.view
+      await refresh() // ensureSelection() picks the first note as a default
+      // Then prefer the exact note the user left on, if it still exists in this view.
+      if (saved && saved.noteId != null && visibleNotes.value.some((n) => n.id === saved.noteId)) {
+        setActive(saved.noteId)
+      }
+      // eslint-disable-next-line no-console
+      console.info(`[notes.store] initialised view=${String(selectedView.value)} note=${selectedNoteId.value}`)
+    } finally {
+      loading.value = false
+      initializing.value = false
+    }
+  }
+
+  // Persist "where I am" (view + active note) on any change, so a relaunch restores it.
+  watch([selectedView, selectedNoteId], () => {
+    saveSession({ view: selectedView.value as number | string, noteId: selectedNoteId.value })
+  })
 
   // ---- navigation ----
 
   async function selectView(view: ViewId): Promise<void> {
     flushPending()
     clearFolderSelection() // navigating away drops any folder multi-selection
+    loading.value = true
     selectedView.value = view
     searchQuery.value = ''
     searchHits.value = []
-    setActive(null)
-    await refresh()
+    setActive(null) // editor shows a skeleton (not the empty state) while loading
+    try {
+      await refresh() // loads the new view's notes, then ensureSelection() picks the first
+    } finally {
+      loading.value = false
+    }
     // eslint-disable-next-line no-console
-    console.info(`[notes.store] view -> ${String(view)}`)
+    console.info(`[notes.store] view -> ${String(view)} (loaded ${visibleNotes.value.length})`)
   }
 
   // ---- selection (single / ctrl-toggle / shift-range) ----
@@ -507,6 +542,8 @@ export const useNotesStore = defineStore('notes', () => {
     notes,
     counts,
     selectedView,
+    loading,
+    initializing,
     selectedNoteId,
     selectedNoteIds,
     searchQuery,

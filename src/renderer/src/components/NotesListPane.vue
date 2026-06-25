@@ -131,6 +131,19 @@ async function emptyTrash(): Promise<void> {
     </header>
 
     <div class="list__scroll">
+      <!-- Loading a view: show placeholder rows instead of an empty/stale list (anti-flicker). -->
+      <template v-if="store.loading">
+        <div v-for="i in 7" :key="`sk-${i}`" class="row row--skeleton">
+          <el-skeleton animated>
+            <template #template>
+              <el-skeleton-item variant="text" style="width: 60%; height: 14px" />
+              <el-skeleton-item variant="text" style="width: 85%; height: 11px; margin-top: 6px" />
+            </template>
+          </el-skeleton>
+        </div>
+      </template>
+
+      <template v-else>
       <p v-if="!store.visibleNotes.length" class="list__empty">
         <span class="list__empty-title">
           {{ store.isSearching ? t('list.no_results') : t('list.no_notes') }}
@@ -192,6 +205,7 @@ async function emptyTrash(): Promise<void> {
           </el-icon>
         </span>
       </button>
+      </template>
     </div>
   </section>
 </template>
@@ -300,6 +314,14 @@ async function emptyTrash(): Promise<void> {
 }
 .row:hover {
   background: var(--bn-hover);
+}
+.row--skeleton {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.row--skeleton:hover {
+  background: transparent;
 }
 .row.is-active {
   background: var(--bn-selection);

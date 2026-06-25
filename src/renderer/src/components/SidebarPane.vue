@@ -105,6 +105,21 @@ async function deleteFolder(id: number): Promise<void> {
         </button>
       </div>
 
+      <!-- First-load placeholder folders so the sidebar doesn't pop in empty. -->
+      <template v-if="store.initializing">
+        <div
+          v-for="i in 6"
+          :key="`fsk-${i}`"
+          class="sidebar__item sidebar__skeleton"
+        >
+          <el-skeleton animated>
+            <template #template>
+              <el-skeleton-item variant="text" style="width: 72%; height: 13px" />
+            </template>
+          </el-skeleton>
+        </div>
+      </template>
+
       <button
         v-for="folder in store.folders"
         :key="folder.id"
@@ -186,6 +201,10 @@ async function deleteFolder(id: number): Promise<void> {
   color: var(--bn-accent-strong);
 }
 /* Folders included in a multi-selection (Ctrl/Shift-click) awaiting a batch Delete. */
+.sidebar__skeleton {
+  pointer-events: none;
+  opacity: 0.7;
+}
 .sidebar__folder.is-multi-selected {
   background: var(--bn-selection);
   box-shadow: inset 0 0 0 1.5px var(--bn-accent);

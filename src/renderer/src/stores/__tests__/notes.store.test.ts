@@ -108,3 +108,48 @@ describe('batch delete', () => {
     expect(store.notes.map((n) => n.id)).toEqual([1])
   })
 })
+
+describe('loading flag + session restore', () => {
+  function memStorage(): Storage {
+    const m = new Map<string, string>()
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+      clear: () => m.clear(),
+      key: () => null,
+      length: 0
+    } as unknown as Storage
+  }
+
+  it('selectView ends with loading=false and the first note selected (no empty flash)', async () => {
+    const store = useNotesStore()
+    api.notes.listByFolder.mockResolvedValueOnce([note(10), note(11)])
+    await store.selectView(5)
+    expect(store.loading).toBe(false)
+    expect(store.selectedNoteId).toBe(10)
+  })
+
+  it('init restores the saved view and the saved note', async () => {
+    vi.stubGlobal('localStorage', memStorage())
+    localStorage.setItem('belnote.session', JSON.stringify({ view: 5, noteId: 11 }))
+    api.folders.list.mockResolvedValueOnce([{ id: 5, name: 'F' } as never])
+    api.notes.listByFolder.mockResolvedValueOnce([note(10), note(11)])
+    const store = useNotesStore()
+    await store.init()
+    expect(store.selectedView).toBe(5)
+    expect(store.selectedNoteId).toBe(11)
+    expect(store.initializing).toBe(false)
+  })
+
+  it('init falls back to the first note when the saved note no longer exists', async () => {
+    vi.stubGlobal('localStorage', memStorage())
+    localStorage.setItem('belnote.session', JSON.stringify({ view: 5, noteId: 999 }))
+    api.folders.list.mockResolvedValueOnce([{ id: 5, name: 'F' } as never])
+    api.notes.listByFolder.mockResolvedValueOnce([note(10), note(11)])
+    const store = useNotesStore()
+    await store.init()
+    expect(store.selectedView).toBe(5)
+    expect(store.selectedNoteId).toBe(10)
+  })
+})

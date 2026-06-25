@@ -35,6 +35,20 @@ function onChange(payload: { html: string; text: string }): void {
       </div>
     </template>
 
+    <!-- While the view's notes load, show a skeleton — never flash the empty state. -->
+    <div v-else-if="store.loading" class="editor-pane__skeleton">
+      <el-skeleton animated>
+        <template #template>
+          <el-skeleton-item variant="h3" style="width: 45%; height: 22px; margin-bottom: 16px" />
+          <el-skeleton-item variant="text" style="width: 92%" />
+          <el-skeleton-item variant="text" style="width: 88%" />
+          <el-skeleton-item variant="text" style="width: 70%" />
+          <el-skeleton-item variant="text" style="width: 80%; margin-top: 12px" />
+          <el-skeleton-item variant="text" style="width: 60%" />
+        </template>
+      </el-skeleton>
+    </div>
+
     <div v-else class="editor-pane__empty">
       <el-icon class="editor-pane__empty-icon"><Document /></el-icon>
       <span class="editor-pane__empty-title">{{ t('editor.empty_title') }}</span>
@@ -53,7 +67,11 @@ function onChange(payload: { html: string; text: string }): void {
   text-align: left;
   font-size: 11.5px;
   color: var(--bn-text-faint);
-  padding: 10px 0 4px 48px;
+  padding: 10px 0 4px 28px;
+}
+.editor-pane__skeleton {
+  padding: 18px 28px;
+  max-width: 820px;
 }
 .editor-pane__body {
   flex: 1;
@@ -61,7 +79,7 @@ function onChange(payload: { html: string; text: string }): void {
   /* min-height:0 so the editor's own scroll area (.note-editor__content) governs scrolling
      instead of this flex child growing to fit a long note. */
   min-height: 0;
-  padding: 4px 48px 24px;
+  padding: 4px 28px 24px;
   max-width: 820px;
   width: 100%;
   /* Left-align the content; do NOT center it (margin:0, not 0 auto) so widening the
