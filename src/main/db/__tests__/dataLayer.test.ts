@@ -50,14 +50,35 @@ describe('FoldersRepo', () => {
     expect(repo.get(f.id)).toBeNull()
   })
 
-  it('deleting a folder cascades to its notes', () => {
+  it('deleting a folder moves its notes to Recently Deleted (not destroyed)', () => {
     const folders = new FoldersRepo(db)
     const notes = new NotesRepo(db)
     const f = folders.create('Temp')
     const n = notes.create(f.id)
 
     folders.delete(f.id)
-    expect(notes.get(n.id)).toBeNull()
+
+    // The note survives — soft-deleted (in the trash) and detached from the now-gone folder.
+    const after = notes.get(n.id)
+    expect(after).not.toBeNull()
+    expect(after?.deletedAt).not.toBeNull()
+    expect(after?.folderId).toBeNull()
+    expect(notes.listDeleted().some((x) => x.id === n.id)).toBe(true)
+  })
+
+  it('deleting a folder leaves its already-trashed notes in the trash', () => {
+    const folders = new FoldersRepo(db)
+    const notes = new NotesRepo(db)
+    const f = folders.create('Temp')
+    const n = notes.create(f.id)
+    notes.trash(n.id)
+
+    folders.delete(f.id)
+
+    const after = notes.get(n.id)
+    expect(after).not.toBeNull()
+    expect(after?.folderId).toBeNull()
+    expect(notes.listDeleted().some((x) => x.id === n.id)).toBe(true)
   })
 })
 

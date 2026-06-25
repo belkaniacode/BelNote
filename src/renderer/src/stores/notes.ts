@@ -451,29 +451,29 @@ export const useNotesStore = defineStore('notes', () => {
     await loadFolders()
   }
 
-  // Delete one or more folders (cascades to their notes). Undoable: the folder + its notes are
-  // snapshotted before deletion and recreated on undo (with new ids — content/pin preserved).
+  // Delete one or more folders. The backend moves each folder's notes to Recently Deleted
+  // (soft-delete + detach) rather than destroying them, so deletion is recoverable. Undoable:
+  // undo recreates the folder and re-attaches + restores its (still-existing, trashed) notes by
+  // id — keeping their content/pins/ids intact.
   async function deleteFolders(ids: number[]): Promise<void> {
     const present = ids.filter((id) => folders.value.some((f) => f.id === id))
     if (!present.length) return
-    // Snapshot each folder and its notes before the cascade delete.
-    const snaps: { name: string; notes: { html: string; text: string; pinned: boolean }[] }[] = []
+    // Snapshot each folder name + the ids of its live notes (the ones that will be trashed).
+    const snaps: { name: string; noteIds: number[] }[] = []
     for (const id of present) {
       const f = folders.value.find((x) => x.id === id)!
       const folderNotes = await window.api.notes.listByFolder(id)
-      snaps.push({
-        name: f.name,
-        notes: folderNotes.map((n) => ({ html: n.contentHtml, text: n.contentText, pinned: n.pinned }))
-      })
+      snaps.push({ name: f.name, noteIds: folderNotes.map((n) => n.id) })
     }
     let liveIds = [...present]
     const doDelete = async (): Promise<void> => {
       for (const id of liveIds) await window.api.folders.delete(id)
       await loadFolders()
+      // Re-fetch the current view + counts so trashed notes show up in Recently Deleted.
       if (typeof selectedView.value === 'number' && liveIds.includes(selectedView.value)) {
         await selectView(ALL_NOTES)
       } else {
-        await loadCounts()
+        await refresh()
       }
       clearFolderSelection()
     }
@@ -482,10 +482,9 @@ export const useNotesStore = defineStore('notes', () => {
       for (const s of snaps) {
         const f = await window.api.folders.create(s.name)
         newIds.push(f.id)
-        for (const n of s.notes) {
-          const created = await window.api.notes.create(f.id)
-          await window.api.notes.update(created.id, n.html, n.text)
-          if (n.pinned) await window.api.notes.setPinned(created.id, true)
+        for (const noteId of s.noteIds) {
+          await window.api.notes.move(noteId, f.id) // re-attach to the recreated folder
+          await window.api.notes.restore(noteId) // bring it back from Recently Deleted
         }
       }
       liveIds = newIds // redo must target the recreated folders
@@ -495,7 +494,7 @@ export const useNotesStore = defineStore('notes', () => {
     await doDelete()
     pushUndo({ undo: restore, redo: doDelete })
     // eslint-disable-next-line no-console
-    console.info(`[FIX] deleted ${present.length} folder(s): ${present.join(',')}`)
+    console.info(`[FIX] deleted ${present.length} folder(s); their notes -> Recently Deleted`)
   }
 
   async function deleteFolder(id: number): Promise<void> {

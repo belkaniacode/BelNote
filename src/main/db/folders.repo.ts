@@ -50,9 +50,28 @@ export class FoldersRepo {
     console.info(`[folders.repo] rename id=${id} -> "${name}"`)
   }
 
+  /**
+   * Delete a folder, sending its notes to Recently Deleted instead of destroying them.
+   * The folder_id FK is ON DELETE CASCADE, so notes still referencing the folder would be
+   * permanently removed. To preserve them we first soft-delete the still-live notes
+   * (deleted_at = now) and detach every note from the folder (folder_id = NULL); already-trashed
+   * notes are merely detached so they stay in the trash. One transaction.
+   */
   delete(id: number): void {
-    this.db.prepare('DELETE FROM folders WHERE id = ?').run(id)
+    const run = this.db.transaction((folderId: number) => {
+      const now = Date.now()
+      const trashed = this.db
+        .prepare(
+          'UPDATE notes SET deleted_at = ?, folder_id = NULL WHERE folder_id = ? AND deleted_at IS NULL'
+        )
+        .run(now, folderId).changes
+      // Detach any remaining (already-trashed) notes so the cascade can't remove them.
+      this.db.prepare('UPDATE notes SET folder_id = NULL WHERE folder_id = ?').run(folderId)
+      this.db.prepare('DELETE FROM folders WHERE id = ?').run(folderId)
+      return trashed
+    })
+    const trashed = run(id)
     // eslint-disable-next-line no-console
-    console.info(`[folders.repo] delete id=${id} (cascades notes)`)
+    console.info(`[folders.repo] delete id=${id} -> ${trashed} note(s) moved to Recently Deleted`)
   }
 }

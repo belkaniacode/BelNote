@@ -57,8 +57,16 @@ export function installDevApiMock(): void {
         if (f) f.name = name
       },
       delete: async (id: number) => {
+        // Mirror FoldersRepo.delete: the folder's notes go to Recently Deleted (soft-delete +
+        // detach), they are NOT destroyed.
+        const now = ++seq
+        notes.forEach((n) => {
+          if (n.folderId === id) {
+            if (n.deletedAt == null) n.deletedAt = now
+            n.folderId = null
+          }
+        })
         folders = folders.filter((x) => x.id !== id)
-        notes = notes.filter((n) => n.folderId !== id)
       }
     },
     notes: {
