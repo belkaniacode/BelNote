@@ -224,6 +224,17 @@ function toggle(cmd: 'bold' | 'italic' | 'heading' | 'code' | 'codeBlock' | 'tas
   font-family: var(--bn-font-mono);
   font-size: 0.92em;
 }
+/* The inline-code chrome above also matches the <code> inside a code block (<pre><code>).
+   Because <code> is inline, its left padding only applies to the START of the inline box —
+   the first line — so the first line gets indented while the rest sit flush. Reset the inner
+   <code> entirely; the <pre> owns the code block's background/padding. */
+:deep(.ProseMirror pre code) {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
 :deep(.ProseMirror ul[data-type='taskList']) {
   list-style: none;
   padding-left: 0;
