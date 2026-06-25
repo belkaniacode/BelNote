@@ -35,19 +35,10 @@ function onChange(payload: { html: string; text: string }): void {
       </div>
     </template>
 
-    <!-- While the view's notes load, show a skeleton — never flash the empty state. -->
-    <div v-else-if="store.loading" class="editor-pane__skeleton">
-      <el-skeleton animated>
-        <template #template>
-          <el-skeleton-item variant="h3" style="width: 45%; height: 22px; margin-bottom: 16px" />
-          <el-skeleton-item variant="text" style="width: 92%" />
-          <el-skeleton-item variant="text" style="width: 88%" />
-          <el-skeleton-item variant="text" style="width: 70%" />
-          <el-skeleton-item variant="text" style="width: 80%; margin-top: 12px" />
-          <el-skeleton-item variant="text" style="width: 60%" />
-        </template>
-      </el-skeleton>
-    </div>
+    <!-- While the view's notes load, the editor is just a clean blank pane — no skeleton, no
+         empty-state icon — so switching folders never jerks. The note (or the empty state for a
+         truly empty folder) appears once the load resolves. -->
+    <div v-else-if="store.loading" class="editor-pane__blank" />
 
     <div v-else class="editor-pane__empty">
       <el-icon class="editor-pane__empty-icon"><Document /></el-icon>
@@ -69,9 +60,8 @@ function onChange(payload: { html: string; text: string }): void {
   color: var(--bn-text-faint);
   padding: 10px 0 4px 28px;
 }
-.editor-pane__skeleton {
-  padding: 18px 28px;
-  max-width: 820px;
+.editor-pane__blank {
+  flex: 1;
 }
 .editor-pane__body {
   flex: 1;

@@ -131,8 +131,9 @@ async function emptyTrash(): Promise<void> {
     </header>
 
     <div class="list__scroll">
-      <!-- Loading a view: show placeholder rows instead of an empty/stale list (anti-flicker). -->
-      <template v-if="store.loading">
+      <!-- Skeleton rows only on the first DB hydrate or a genuinely slow load (> ~150ms), never
+           on instant folder switches — otherwise they flash for a frame and look jerky. -->
+      <template v-if="store.initializing || store.slowLoading">
         <div v-for="i in 7" :key="`sk-${i}`" class="row row--skeleton">
           <el-skeleton animated>
             <template #template>

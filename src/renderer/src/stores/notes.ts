@@ -29,10 +29,30 @@ export const useNotesStore = defineStore('notes', () => {
   })
 
   const selectedView = ref<ViewId>(ALL_NOTES)
-  // Async-load state for skeletons / anti-flicker. `loading` is true while a view's notes are
-  // being (re)loaded; `initializing` is true only during the very first hydrate on launch.
+  // Async-load state. `loading` is true while a view's notes are (re)loaded; `initializing`
+  // is true only during the very first hydrate on launch. `slowLoading` becomes true ONLY if a
+  // load actually takes a while (> SLOW_MS) — SQLite reads are usually instant, so binding
+  // skeletons to raw `loading` made them flash for a single frame on every folder switch (the
+  // "jerk"). Skeletons bind to `slowLoading`, so a fast switch shows no skeleton at all.
   const loading = ref(false)
+  const slowLoading = ref(false)
   const initializing = ref(true)
+  const SLOW_MS = 150
+  let slowTimer: ReturnType<typeof setTimeout> | null = null
+
+  function beginLoading(): void {
+    loading.value = true
+    if (slowTimer) clearTimeout(slowTimer)
+    slowTimer = setTimeout(() => {
+      slowLoading.value = true
+    }, SLOW_MS)
+  }
+  function endLoading(): void {
+    loading.value = false
+    if (slowTimer) clearTimeout(slowTimer)
+    slowTimer = null
+    slowLoading.value = false
+  }
   // Bumped only when a note is freshly created, to tell the editor to grab focus for typing.
   // (Plain selection must NOT focus the editor, or the list loses the Delete-key shortcut.)
   const editorFocusTick = ref(0)
@@ -141,7 +161,7 @@ export const useNotesStore = defineStore('notes', () => {
 
   async function init(): Promise<void> {
     initializing.value = true
-    loading.value = true
+    beginLoading()
     try {
       await loadFolders()
       // Restore the last view BEFORE loading notes so the first paint is the right pane.
@@ -155,7 +175,7 @@ export const useNotesStore = defineStore('notes', () => {
       // eslint-disable-next-line no-console
       console.info(`[notes.store] initialised view=${String(selectedView.value)} note=${selectedNoteId.value}`)
     } finally {
-      loading.value = false
+      endLoading()
       initializing.value = false
     }
   }
@@ -170,15 +190,15 @@ export const useNotesStore = defineStore('notes', () => {
   async function selectView(view: ViewId): Promise<void> {
     flushPending()
     clearFolderSelection() // navigating away drops any folder multi-selection
-    loading.value = true
+    beginLoading()
     selectedView.value = view
     searchQuery.value = ''
     searchHits.value = []
-    setActive(null) // editor shows a skeleton (not the empty state) while loading
+    setActive(null) // editor goes blank (no empty-state, no skeleton) until the load resolves
     try {
       await refresh() // loads the new view's notes, then ensureSelection() picks the first
     } finally {
-      loading.value = false
+      endLoading()
     }
     // eslint-disable-next-line no-console
     console.info(`[notes.store] view -> ${String(view)} (loaded ${visibleNotes.value.length})`)
@@ -543,6 +563,7 @@ export const useNotesStore = defineStore('notes', () => {
     counts,
     selectedView,
     loading,
+    slowLoading,
     initializing,
     selectedNoteId,
     selectedNoteIds,
