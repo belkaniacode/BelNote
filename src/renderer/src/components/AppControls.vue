@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { Sunny, Moon, Monitor, Fold } from '@element-plus/icons-vue'
+import { Sunny, Moon, Monitor } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '../stores/settings'
-import { useLayout } from '../composables/useLayout'
 import { SUPPORTED_LOCALES, type Locale } from '../i18n'
 import type { ThemeMode } from '../composables/useTheme'
 
-// Footer controls: collapse sidebar + theme (Light / Dark / System) + language.
+// Footer controls: theme (Light / Dark / System) + language. Both persist via the store.
 const { t } = useI18n()
 const settings = useSettingsStore()
-// Sidebar collapse lives here in the footer; when hidden, reopen with Ctrl/Cmd+\.
-const { toggleSidebar } = useLayout()
 
 const themes: { mode: ThemeMode; icon: unknown; label: string }[] = [
   { mode: 'light', icon: Sunny, label: t('settings.theme_light') },
@@ -21,14 +18,6 @@ const themes: { mode: ThemeMode; icon: unknown; label: string }[] = [
 
 <template>
   <div class="controls">
-    <button
-      class="controls__collapse"
-      :title="t('list.toggle_sidebar')"
-      @click="toggleSidebar"
-    >
-      <el-icon><Fold /></el-icon>
-    </button>
-
     <div class="controls__themes">
       <button
         v-for="opt in themes"
@@ -59,23 +48,6 @@ const themes: { mode: ThemeMode; icon: unknown; label: string }[] = [
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-}
-.controls__collapse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  color: var(--bn-text-muted);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all var(--bn-transition);
-}
-.controls__collapse:hover {
-  background: var(--bn-hover);
-  color: var(--bn-text);
 }
 .controls__themes {
   display: flex;

@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Search, EditPen, More, Delete, RefreshLeft } from '@element-plus/icons-vue'
+import { Search, EditPen, More, Delete, RefreshLeft, Fold, Expand } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useNotesStore } from '../stores/notes'
+import { useLayout } from '../composables/useLayout'
 import { deriveSnippet } from '@shared/noteText'
 import { relativeDate } from '../utils/relativeDate'
 import type { Note } from '@shared/types'
 
 const { t } = useI18n()
 const store = useNotesStore()
+// Sidebar collapse toggle lives here (left of the list header) so it's reachable even when the
+// sidebar is hidden. Fold icon when expanded, Expand icon when collapsed.
+const { collapsed, toggleSidebar } = useLayout()
 
 const searchModel = computed({
   get: () => store.searchQuery,
@@ -89,6 +93,13 @@ async function emptyTrash(): Promise<void> {
   <section class="list">
     <header class="list__header">
       <div class="list__top">
+        <button
+          class="list__sidebar-toggle"
+          :title="t('list.toggle_sidebar')"
+          @click="toggleSidebar"
+        >
+          <el-icon><component :is="collapsed ? Expand : Fold" /></el-icon>
+        </button>
         <h2 class="list__title">{{ headerTitle }}</h2>
         <button
           v-if="store.isTrashView && store.counts.trash"
@@ -223,6 +234,23 @@ async function emptyTrash(): Promise<void> {
 .list__new:hover,
 .list__empty-btn:hover {
   background: var(--bn-hover);
+}
+/* Sidebar show/hide toggle — sits at the far left of the list header, always visible. */
+.list__sidebar-toggle {
+  border: none;
+  background: transparent;
+  color: var(--bn-text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  margin-right: 2px;
+  font-size: 15px;
+}
+.list__sidebar-toggle:hover {
+  background: var(--bn-hover);
+  color: var(--bn-text);
 }
 .list__search :deep(.el-input__wrapper) {
   border-radius: 8px;
