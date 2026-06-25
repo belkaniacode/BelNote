@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8e72f4"/>
+      <stop offset="1" stop-color="#6242d6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#2a1d6b" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  <!-- lavender squircle background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#bg)"/>
+
+  <!-- white note sheet -->
+  <g filter="url(#shadow)">
+    <rect x="296" y="232" width="432" height="560" rx="56" ry="56" fill="#ffffff"/>
+  </g>
+
+  <!-- task line with check -->
+  <g>
+    <rect x="356" y="332" width="64" height="64" rx="18" ry="18" fill="#efeafe"/>
+    <path d="M370 364 l14 16 l24 -30" fill="none" stroke="#6242d6" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="444" y="350" width="224" height="28" rx="14" ry="14" fill="#6242d6"/>
+  </g>
+
+  <!-- text lines -->
+  <rect x="356" y="452" width="312" height="26" rx="13" ry="13" fill="#cabdf5"/>
+  <rect x="356" y="528" width="312" height="26" rx="13" ry="13" fill="#cabdf5"/>
+  <rect x="356" y="604" width="208" height="26" rx="13" ry="13" fill="#cabdf5"/>
+  <rect x="356" y="680" width="256" height="26" rx="13" ry="13" fill="#cabdf5"/>
+</svg>
