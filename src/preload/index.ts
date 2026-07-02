@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Folder, Note, SearchHit } from '@shared/types'
+import type {
+  Folder,
+  Note,
+  SearchHit,
+  ExportResult,
+  ImportResult,
+  ImportMode
+} from '@shared/types'
 
 /**
  * Typed, minimal bridge exposed to the renderer as window.api. Each method is a thin
@@ -39,6 +46,15 @@ const api = {
 
   search: {
     query: (query: string): Promise<SearchHit[]> => ipcRenderer.invoke('search:query', query)
+  },
+
+  // Encrypted full-library backup. The passphrase never leaves the local machine; main opens
+  // the native save/open dialog and does all crypto + DB work.
+  data: {
+    export: (passphrase: string): Promise<ExportResult> =>
+      ipcRenderer.invoke('data:export', passphrase),
+    import: (passphrase: string, mode: ImportMode = 'merge'): Promise<ImportResult> =>
+      ipcRenderer.invoke('data:import', passphrase, mode)
   }
 }
 

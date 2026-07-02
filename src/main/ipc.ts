@@ -1,8 +1,13 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain, shell, dialog, BrowserWindow, app } from 'electron'
+import { writeFile, readFile } from 'fs/promises'
+import { join } from 'path'
 import { getDb } from './db'
 import { FoldersRepo } from './db/folders.repo'
 import { NotesRepo } from './db/notes.repo'
 import { SearchRepo } from './db/search.repo'
+import { collectBackup, restoreBackup, assertValidPayload } from './transfer/backup'
+import { encrypt, decrypt, BadPassphraseError, CorruptFileError } from './transfer/crypto'
+import type { ExportResult, ImportResult } from '@shared/types'
 
 /**
  * The single place that maps IPC channels to repository operations. Every handler is
@@ -54,6 +59,64 @@ export function registerIpc(): void {
 
   // Search
   handle('search:query', (query) => search.search(query as string))
+
+  // Encrypted data transfer (full backup export / merge import).
+  // These are async and return structured results ({ok|canceled|error}) rather than throwing
+  // for expected outcomes (user cancels the dialog, wrong passphrase, corrupt file), so the
+  // renderer can show a friendly toast. SECURITY: the passphrase is never logged.
+  handle('data:export', async (passphrase) => {
+    const pass = passphrase as string
+    const date = new Date().toISOString().slice(0, 10)
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const dlg = await dialog.showSaveDialog(win!, {
+      title: 'BelNote — Export',
+      defaultPath: join(app.getPath('documents'), `BelNote-backup-${date}.blnt`),
+      filters: [{ name: 'BelNote backup', extensions: ['blnt'] }]
+    })
+    if (dlg.canceled || !dlg.filePath) return { canceled: true } as ExportResult
+
+    const payload = collectBackup(db)
+    const plaintext = Buffer.from(JSON.stringify(payload), 'utf8')
+    const file = encrypt(plaintext, pass)
+    await writeFile(dlg.filePath, file)
+    // eslint-disable-next-line no-console
+    console.info(`[ipc] data:export wrote ${file.length}B -> ${dlg.filePath}`)
+    return {
+      ok: true,
+      path: dlg.filePath,
+      counts: { folders: payload.folders.length, notes: payload.notes.length }
+    } as ExportResult
+  })
+
+  handle('data:import', async (passphrase, mode) => {
+    const pass = passphrase as string
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const dlg = await dialog.showOpenDialog(win!, {
+      title: 'BelNote — Import',
+      properties: ['openFile'],
+      filters: [{ name: 'BelNote backup', extensions: ['blnt'] }]
+    })
+    if (dlg.canceled || !dlg.filePaths[0]) return { canceled: true } as ImportResult
+
+    let payload
+    try {
+      const file = await readFile(dlg.filePaths[0])
+      const plaintext = decrypt(file, pass)
+      payload = JSON.parse(plaintext.toString('utf8'))
+      assertValidPayload(payload)
+    } catch (err) {
+      if (err instanceof BadPassphraseError) return { ok: false, error: 'bad_password' } as ImportResult
+      if (err instanceof CorruptFileError || err instanceof SyntaxError) {
+        return { ok: false, error: 'corrupt_file' } as ImportResult
+      }
+      throw err
+    }
+
+    const counts = restoreBackup(db, payload, (mode as 'merge') ?? 'merge')
+    // eslint-disable-next-line no-console
+    console.info(`[ipc] data:import merged +${counts.folders} folder(s) +${counts.notes} note(s)`)
+    return { ok: true, counts } as ImportResult
+  })
 
   // External links (kept here so all IPC lives in one module)
   handle('open-external', (url) => {
