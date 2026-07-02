@@ -44,6 +44,17 @@ export class FoldersRepo {
     return this.get(Number(info.lastInsertRowid))!
   }
 
+  /**
+   * Insert a folder from an imported backup, preserving its name/order/timestamp but letting
+   * SQLite assign a fresh id (the caller maps old→new ids). Used by restoreBackup (merge).
+   */
+  insertImported(f: { name: string; sortOrder: number; createdAt: number }): number {
+    const info = this.db
+      .prepare('INSERT INTO folders (name, sort_order, created_at) VALUES (?, ?, ?)')
+      .run(f.name, f.sortOrder, f.createdAt)
+    return Number(info.lastInsertRowid)
+  }
+
   rename(id: number, name: string): void {
     this.db.prepare('UPDATE folders SET name = ? WHERE id = ?').run(name.trim() || 'Untitled', id)
     // eslint-disable-next-line no-console

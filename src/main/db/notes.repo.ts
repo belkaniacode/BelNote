@@ -74,6 +74,45 @@ export class NotesRepo {
     return row ? mapNote(row) : null
   }
 
+  /** Every note (including trashed ones) — used to build a full backup export. */
+  allForExport(): Note[] {
+    const rows = this.db.prepare('SELECT * FROM notes ORDER BY id').all() as NoteRow[]
+    return rows.map(mapNote)
+  }
+
+  /**
+   * Insert a note from an imported backup, preserving all its fields (incl. pinned/deleted_at)
+   * but letting SQLite assign a fresh id and taking a remapped folderId. Used by restoreBackup.
+   */
+  insertImported(n: {
+    folderId: number | null
+    title: string
+    contentHtml: string
+    contentText: string
+    pinned: boolean
+    createdAt: number
+    updatedAt: number
+    deletedAt: number | null
+  }): number {
+    const info = this.db
+      .prepare(
+        `INSERT INTO notes
+           (folder_id, title, content_html, content_text, pinned, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        n.folderId,
+        n.title,
+        n.contentHtml,
+        n.contentText,
+        n.pinned ? 1 : 0,
+        n.createdAt,
+        n.updatedAt,
+        n.deletedAt
+      )
+    return Number(info.lastInsertRowid)
+  }
+
   create(folderId: number): Note {
     const now = Date.now()
     const info = this.db
