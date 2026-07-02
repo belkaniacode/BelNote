@@ -1,44 +1,23 @@
 <script setup lang="ts">
-import { Sunny, Moon, Monitor } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
-import { useSettingsStore } from '../stores/settings'
-import { SUPPORTED_LOCALES, type Locale } from '../i18n'
-import type { ThemeMode } from '../composables/useTheme'
+import SettingsModal from './SettingsModal.vue'
 
-// Footer controls: theme (Light / Dark / System) + language. Both persist via the store.
+// Sidebar footer: a single gear button that opens the Settings modal (theme, language, and
+// encrypted data export/import all live inside the modal now).
 const { t } = useI18n()
-const settings = useSettingsStore()
-
-const themes: { mode: ThemeMode; icon: unknown; label: string }[] = [
-  { mode: 'light', icon: Sunny, label: t('settings.theme_light') },
-  { mode: 'dark', icon: Moon, label: t('settings.theme_dark') },
-  { mode: 'system', icon: Monitor, label: t('settings.theme_system') }
-]
+const open = ref(false)
 </script>
 
 <template>
   <div class="controls">
-    <div class="controls__themes">
-      <button
-        v-for="opt in themes"
-        :key="opt.mode"
-        class="controls__theme"
-        :class="{ 'is-active': settings.themeMode === opt.mode }"
-        :title="opt.label"
-        @click="settings.setTheme(opt.mode)"
-      >
-        <el-icon><component :is="opt.icon" /></el-icon>
-      </button>
-    </div>
+    <button class="controls__gear" :title="t('settings.open')" @click="open = true">
+      <el-icon><Setting /></el-icon>
+      <span class="controls__gear-label">{{ t('settings.title') }}</span>
+    </button>
 
-    <el-select
-      :model-value="settings.locale"
-      size="small"
-      class="controls__lang"
-      @update:model-value="(v: Locale) => settings.setLanguage(v)"
-    >
-      <el-option v-for="l in SUPPORTED_LOCALES" :key="l" :label="l.toUpperCase()" :value="l" />
-    </el-select>
+    <SettingsModal v-model="open" />
   </div>
 </template>
 
@@ -46,39 +25,27 @@ const themes: { mode: ThemeMode; icon: unknown; label: string }[] = [
 .controls {
   display: flex;
   align-items: center;
-  gap: 8px;
   padding: 4px 6px;
 }
-.controls__themes {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--bn-hover);
-  border-radius: var(--bn-radius-sm);
-}
-.controls__theme {
+.controls__gear {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 24px;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
   border: none;
   background: transparent;
   color: var(--bn-text-muted);
-  border-radius: 5px;
+  border-radius: var(--bn-radius-sm);
   cursor: pointer;
+  font-size: 13px;
   transition: all var(--bn-transition);
 }
-.controls__theme:hover {
+.controls__gear:hover {
+  background: var(--bn-hover);
   color: var(--bn-text);
 }
-.controls__theme.is-active {
-  background: var(--bn-surface);
-  color: var(--bn-accent-strong);
-  box-shadow: var(--bn-shadow);
-}
-.controls__lang {
-  width: 74px;
-  margin-left: auto;
+.controls__gear-label {
+  font-weight: 500;
 }
 </style>

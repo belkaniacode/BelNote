@@ -48,12 +48,33 @@
     "language": "Language"
   },
   "settings": {
+    "title": "Settings",
+    "open": "Settings",
     "appearance": "Appearance",
     "theme": "Theme",
     "theme_light": "Light",
     "theme_dark": "Dark",
     "theme_system": "System",
-    "language": "Language"
+    "language": "Language",
+    "data": "Data",
+    "data_hint": "Export all notes to an encrypted file and import them on another computer.",
+    "export": "Export",
+    "import": "Import",
+    "password": "Password",
+    "password_confirm": "Confirm password",
+    "password_hint": "The file is encrypted with this password. Without it the data can't be read — keep it safe.",
+    "import_password_hint": "Enter the password the file was encrypted with.",
+    "encrypt_save": "Encrypt & save",
+    "decrypt_import": "Decrypt & import",
+    "export_success": "Exported {folders} folders, {notes} notes",
+    "import_success": "Imported {folders} folders, {notes} notes"
+  },
+  "errors": {
+    "password_short": "Password must be at least 8 characters",
+    "password_mismatch": "Passwords do not match",
+    "bad_password": "Wrong password or the file is damaged",
+    "corrupt_file": "The file is not a BelNote backup or is corrupt",
+    "generic": "The operation failed"
   },
   "date": {
     "today": "Today",

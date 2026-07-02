@@ -180,6 +180,19 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  /** Re-hydrate folders + current view from the DB (e.g. after an import merged new data). */
+  async function reload(): Promise<void> {
+    beginLoading()
+    try {
+      await loadFolders()
+      await refresh()
+    } finally {
+      endLoading()
+    }
+    // eslint-disable-next-line no-console
+    console.info(`[notes.store] reloaded (folders=${folders.value.length})`)
+  }
+
   // Persist "where I am" (view + active note) on any change, so a relaunch restores it.
   watch([selectedView, selectedNoteId], () => {
     saveSession({ view: selectedView.value as number | string, noteId: selectedNoteId.value })
@@ -579,6 +592,7 @@ export const useNotesStore = defineStore('notes', () => {
     targetFolderId,
     // actions
     init,
+    reload,
     selectView,
     selectSingle,
     toggleSelect,
